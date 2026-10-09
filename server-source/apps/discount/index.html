@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>折扣动作台账</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="title-block">
+          <p class="eyebrow">Amazon Discount Tracker</p>
+          <div class="title-row">
+            <h1>折扣动作台账</h1>
+            <label class="title-filter">
+              <span>负责人</span>
+              <select id="summaryOwnerFilter">
+                <option value="all">全部负责人</option>
+                <option value="图图">图图</option>
+                <option value="凯旋">凯旋</option>
+                <option value="CC">CC</option>
+                <option value="团队">团队</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="today-card">
+          <span>今天</span>
+          <strong id="todayText"></strong>
+        </div>
+      </header>
+
+      <section class="summary-grid" aria-label="折扣概览">
+        <article class="metric">
+          <span>进行中</span>
+          <strong id="activeCount">0</strong>
+        </article>
+        <article class="metric warn">
+          <label class="metric-select-label" for="expiringWindow">
+            <span>到期提醒</span>
+            <select id="expiringWindow">
+              <option value="3">3 天内到期</option>
+              <option value="7" selected>7 天内到期</option>
+            </select>
+          </label>
+          <strong id="expiringCount">0</strong>
+        </article>
+        <article class="metric danger">
+          <span>已过期未处理</span>
+          <strong id="expiredCount">0</strong>
+        </article>
+        <article class="metric">
+          <span>折扣金额合计</span>
+          <strong id="valueTotal">$0.00</strong>
+        </article>
+      </section>
+
+      <section class="alert-strip" id="alertStrip" hidden></section>
+
+      <section class="workspace">
+        <section class="panel table-panel">
+          <div class="panel-heading import-heading">
+            <div>
+              <h2>折扣记录</h2>
+              <p>先填导入设置，再选择亚马逊价格折扣 Excel。</p>
+            </div>
+            <div class="actions">
+              <label class="file-button">
+                导入 Excel
+                <input id="excelInput" type="file" accept=".xlsx,.xls" />
+              </label>
+              <button id="exportButton" class="ghost" type="button">生成共享数据</button>
+              <button id="clearButton" class="ghost danger-text" type="button">清空</button>
+            </div>
+          </div>
+
+          <div class="import-tools" id="importTools">
+            <label>
+              <span>内部标题</span>
+              <input id="importTitle" required placeholder="例如：滞销品7.11数据" />
+            </label>
+            <label>
+              <span>负责人</span>
+              <select id="importOwner" required>
+                <option value="">请选择负责人</option>
+                <option value="图图">图图</option>
+                <option value="凯旋">凯旋</option>
+                <option value="CC">CC</option>
+                <option value="团队">团队</option>
+              </select>
+            </label>
+            <label>
+              <span>导入开始日期</span>
+              <input id="importStart" type="date" required />
+            </label>
+            <label>
+              <span>导入结束日期</span>
+              <input id="importEnd" type="date" required />
+            </label>
+            <label>
+              <span>默认原因</span>
+              <select id="importReason">
+                <option value="价格折扣活动">价格折扣活动</option>
+                <option value="清库存">清库存</option>
+                <option value="测款">测款</option>
+                <option value="跟价">跟价</option>
+                <option value="冲销量">冲销量</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="filters">
+            <input id="searchInput" placeholder="搜索内部标题 / 负责人 / SKU / 商品名 / 备注" />
+            <select id="ownerFilter">
+              <option value="all">全部负责人</option>
+              <option value="图图">图图</option>
+              <option value="凯旋">凯旋</option>
+              <option value="CC">CC</option>
+              <option value="团队">团队</option>
+            </select>
+            <select id="statusFilter">
+              <option value="all">全部状态</option>
+              <option value="active">进行中</option>
+              <option value="expiring">即将到期</option>
+              <option value="expired">已过期</option>
+              <option value="planned">未开始</option>
+              <option value="closed">已关闭</option>
+              <option value="error">亚马逊错误</option>
+            </select>
+            <select id="reasonFilter">
+              <option value="all">全部原因</option>
+              <option value="价格折扣活动">价格折扣活动</option>
+              <option value="清库存">清库存</option>
+              <option value="测款">测款</option>
+              <option value="跟价">跟价</option>
+              <option value="冲销量">冲销量</option>
+            </select>
+          </div>
+          <div class="quick-filters" aria-label="快速筛选">
+            <button class="quick-filter" type="button" data-quick-filter="expired">已过期</button>
+            <button class="quick-filter" type="button" data-quick-filter="expiring">即将到期</button>
+            <button class="quick-filter" type="button" data-quick-filter="error">有错误</button>
+            <button class="quick-filter" type="button" data-quick-filter="owner">当前负责人</button>
+            <button class="quick-filter ghost" type="button" data-quick-filter="reset">重置</button>
+          </div>
+          <div class="bulk-toolbar" id="bulkToolbar" hidden>
+            <strong id="bulkSummary">未选择记录</strong>
+            <div class="bulk-actions">
+              <button class="ghost danger-text" id="deleteSelectedBatches" type="button">删除所选批次</button>
+              <button class="ghost danger-text" id="deleteSelectedSkus" type="button">删除所选 SKU</button>
+              <button class="ghost" id="clearSelection" type="button">取消选择</button>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>批次 / SKU</th>
+                  <th>状态</th>
+                  <th>负责人</th>
+                  <th>折扣后价格</th>
+                  <th>到期日期</th>
+                  <th>单条 SKU 数量</th>
+                  <th>原因 / 错误</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="recordRows"></tbody>
+            </table>
+            <div class="empty-state" id="emptyState">
+              <strong>还没有折扣记录</strong>
+              <span>导入亚马逊价格折扣 Excel 后会显示在这里。</span>
+            </div>
+          </div>
+
+          <div class="pagination">
+            <span id="pageInfo">0 条记录</span>
+            <div class="pagination-controls">
+              <label>
+                <span>每页</span>
+                <select id="pageSize">
+                  <option value="20">20 批</option>
+                  <option value="50">50 批</option>
+                </select>
+              </label>
+              <button id="prevPage" class="ghost" type="button">上一页</button>
+              <strong id="pageIndicator">1 / 1</strong>
+              <button id="nextPage" class="ghost" type="button">下一页</button>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="detailDialog">
+      <form method="dialog" class="dialog-card">
+        <button class="icon-close" value="close" aria-label="关闭">×</button>
+        <h2 id="detailTitle">折扣详情</h2>
+        <dl id="detailList"></dl>
+      </form>
+    </dialog>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
